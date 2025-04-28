@@ -43,7 +43,3 @@ Hyperparameter tuning
 
 Feature importance analysis
 
-Bonus:
-If you want, I can also generate some badges (like build passing, python version, license, etc.) and a little "Project Structure" diagram to make it even cooler! 🔥
-
-Want me to? 🚀✨
