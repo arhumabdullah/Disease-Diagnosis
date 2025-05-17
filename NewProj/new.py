@@ -3,49 +3,71 @@ import seaborn as sns
 import matplotlib.pyplot as plt
 import numpy as np
 df = pd.read_csv("data.csv")
-# df.head()
+
 df = df.drop(['CholCheck','NoDocbcCost','DiffWalk','Sex','Education','Income'], axis='columns')
-# df.head()
+
 diseases = ['Diabetes_binary','Stroke','HeartDiseaseorAttack']
 healthFact = ['HighBP','HighChol','BMI','HvyAlcoholConsump'
 ,'GenHlth','MentHlth','PhysHlth','Age' ]
-# subset1 =df[diseases+healthFact]
-# corelation = subset1.corr()
-# diseaseCor = corelation.loc[diseases,healthFact]
-# plt.figure(figsize=(12,6))
-# sns.heatmap(diseaseCor,annot=True,cmap='coolwarm',fmt=".2f")
-# plt.tight_layout()
-# plt.show()
 
-from sklearn.model_selection import train_test_split
+
 y=df[ ['Diabetes_binary','Stroke','HeartDiseaseorAttack']]
 x=df[['HighBP','HighChol','BMI','HvyAlcoholConsump'
 ,'GenHlth','MentHlth','PhysHlth','Age' ]]
 
-# from imblearn.over_sampling import SMOTE
-# smote = SMOTE()
-# xResampled,yResampled = smote.fit_resample(x,y)
-
-xtrain,xtest,ytrain,ytest = train_test_split(x,y,train_size=0.7,random_state=42)
 
 
-from sklearn.multioutput import MultiOutputClassifier
+
+from imblearn.over_sampling import SMOTE
+xResampled = []
+yResampled = []
+lengths =[]
+for i in range (y.shape[1]):
+    smote = SMOTE(random_state=42)
+    xi,yi = smote.fit_resample(x,y.iloc[:,i])
+    indexResampled = yi.index
+    xResampled.append(xi)
+    yResampled.append(yi)
+    lengths.append(len(xi))
+
+minlength = min(lengths)
+
+xFinal = xResampled[0].iloc[:minlength,:].reset_index(drop=True)
+yFinal = pd.concat([yi.iloc[:minlength].reset_index(drop=True)for yi in yResampled],axis=1)
+yFinal.columns = y.columns
 
 
-# from sklearn.ensemble import RandomForestClassifier
-# baseModel= RandomForestClassifier(n_estimators=1000,random_state=42)
 
 
-from xgboost import XGBClassifier
-baseModel = XGBClassifier(
-    scale_pos_weight=3.5,
-    n_estimators = 100,
-    learning_rate = 0.1,
-    max_depth = 3,
-    random_state = 42,
-    eval_metric = 'logloss'
-)
-model = MultiOutputClassifier(baseModel)
+from sklearn.model_selection import train_test_split
+xtrain,xtest,ytrain,ytest = train_test_split(xFinal,yFinal,train_size=0.7,random_state=42)
+
+
+
+
+
+from sklearn.multiclass import OneVsRestClassifier
+
+
+from sklearn.ensemble import RandomForestClassifier
+baseModel= RandomForestClassifier(n_estimators=100,random_state=42)
+
+model = OneVsRestClassifier(baseModel)
 model.fit(xtrain,ytrain)
-print(model.predict([[1,1,30,0,5,30,30,9]]))
-print(model.score(xtest,ytest))
+
+
+
+
+from sklearn.metrics import accuracy_score, hamming_loss, f1_score, classification_report
+y_pred = model.predict(xtest)
+strict_acc = accuracy_score(ytest, y_pred)
+hamming_acc = 1 - hamming_loss(ytest, y_pred)
+f1 = f1_score(ytest, y_pred, average='samples')
+print("\n🎯 Evaluation Metrics:")
+print("-------------------------")
+print("Strict Accuracy Score       :", round(strict_acc, 4))
+print("Hamming Accuracy Score      :", round(hamming_acc, 4))
+print("F1 Score (samples average)  :", round(f1, 4))
+print("\n📊 Detailed Classification Report:")
+print("-----------------------------------")
+print(classification_report(ytest, y_pred, target_names=y.columns))
